@@ -2,7 +2,6 @@ package com.palmercox.rustcryptotester;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -13,29 +12,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.apache.commons.codec.binary.Hex;
-
-class RustCryptException extends Exception {
-	private static final long serialVersionUID = 1L;
-
-	private final int code;
-	
-	public RustCryptException(final int code, final String msg) {
-		super(msg);
-		this.code = code;
-	}
-
-	public int getCode() {
-		return code;
-	}
-}
-
 public final class RustCryptRunner {
-	
 	private final File rustExec;
+	private final ExecutorService exec;
 	
 	public RustCryptRunner(final File rustExec) {
 		this.rustExec = rustExec;
+		exec = Executors.newCachedThreadPool();
 	}
 
 	private static final class OutputReader implements Callable<ByteArrayOutputStream> {
@@ -67,60 +50,39 @@ public final class RustCryptRunner {
 		return sb.toString();
 	}
 	
-	public byte[] runRustCrypt(final Object... parameters) throws Exception {
+	public byte[] runRustCrypt(final byte[] data, final Object... parameters) throws Exception {
+		final List<String> params = new ArrayList<>();
 
-		final List<String> smallParams = new ArrayList<>();
-		final List<byte[]> largeParams = new ArrayList<>();
-
-		smallParams.add(rustExec.getAbsolutePath());
+		params.add(rustExec.getAbsolutePath());
 		
 		for (final Object p : parameters) {
-			if (p instanceof String) {
-				smallParams.add(p.toString());
-			} else if (p instanceof Integer) {
-				smallParams.add(p.toString());
-			} else if (p instanceof byte[]) {
-				final byte[] b = (byte[]) p;
-				if (b.length <= 32) {
-					smallParams.add(Hex.encodeHexString(b));
-				} else {
-					smallParams.add("-");
-					largeParams.add(b);
-				}
-			}
+			params.add(p.toString());
 		}
 		
-		final ProcessBuilder pb = new ProcessBuilder(smallParams);
+		final ProcessBuilder pb = new ProcessBuilder(params);
 
 		final Process p = pb.start();
 
-		// Write all the large inputs
-		if (!largeParams.isEmpty()) {
-			final DataOutputStream out = new DataOutputStream(p.getOutputStream());
-			for (final byte[] d : largeParams) {
-				out.writeInt(d.length);
-				out.write(d);
-			}
-			out.flush();
+		if (data != null) {
+			p.getOutputStream().write(data);
 		}
 		p.getOutputStream().close();
 		
-		final ExecutorService exec = Executors.newFixedThreadPool(2);
-		try {
-			final Future<ByteArrayOutputStream> in = 
-					exec.submit(new OutputReader(p.getInputStream()));
-			final Future<ByteArrayOutputStream> err = 
-					exec.submit(new OutputReader(p.getErrorStream()));
-			
-			final int result = p.waitFor();
-	
-			if(result != 0) {
-				throw new RustCryptException(result, getMessage(err.get().toByteArray()));
-			}
-	
-			return in.get().toByteArray();
-		} finally {
-			exec.shutdown();
+		final Future<ByteArrayOutputStream> in = 
+				exec.submit(new OutputReader(p.getInputStream()));
+		final Future<ByteArrayOutputStream> err = 
+				exec.submit(new OutputReader(p.getErrorStream()));
+		
+		final int result = p.waitFor();
+
+		if(result != 0) {
+			throw new RustCryptException(result, getMessage(err.get().toByteArray()));
 		}
+
+		return in.get().toByteArray();
+	}
+	
+	public final void close() {
+		exec.shutdown();
 	}
 }

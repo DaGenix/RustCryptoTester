@@ -1,5 +1,7 @@
 package com.palmercox.rustcryptotester;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
@@ -36,24 +38,20 @@ public class ScryptTester extends Tester {
 			final int logN,
 			final int r,
 			final int p,
-			final byte[] salt,
-			final byte[] password,
 			final int dkLen) {
 		final ArrayList<Object> arr = new ArrayList<>();
 		arr.add("scrypt");
-		arr.add("-raw");
 		arr.add("-logn");
 		arr.add(logN);
 		arr.add("-r");
 		arr.add(r);
 		arr.add("-p");
 		arr.add(p);
-		arr.add("-salt");
-		arr.add(salt);
-		arr.add("-password");
-		arr.add(password);
 		arr.add("-dklen");
 		arr.add(dkLen);
+		arr.add("-rawsalt");
+		arr.add("-rawpassword");
+		arr.add("-rawoutput");
 		return arr.toArray();
 	}
 	
@@ -61,7 +59,6 @@ public class ScryptTester extends Tester {
 	public boolean test(
 			final RustCryptRunner runner,
 			final Random rand) throws Exception {
-		
 		for (int i = 0; i < count; i++) {
 			final int logN = rand.nextInt(maxLogN - minLogN) + minLogN;
 			final int r = rand.nextInt(maxR - minR) + minR;
@@ -72,7 +69,16 @@ public class ScryptTester extends Tester {
 			rand.nextBytes(password);
 			final int dkLen = rand.nextInt(512);
 			
-			final byte[] result = runner.runRustCrypt(getParams(logN, r, p, salt, password, dkLen));
+			final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			final DataOutputStream dataStream = new DataOutputStream(bos);
+			dataStream.write(salt.length);
+			dataStream.write(salt);
+			dataStream.write(password.length);
+			dataStream.write(password);
+			dataStream.close();
+			final byte[] data = bos.toByteArray();
+			
+			final byte[] result = runner.runRustCrypt(data, getParams(logN, r, p, dkLen));
 			
 			final byte[] expectedResult = SCrypt.scrypt(password, salt, (1 << logN), r, p, dkLen);
 			
