@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.apache.commons.codec.binary.Hex;
+
 import com.lambdaworks.crypto.SCrypt;
 
 public class ScryptTester extends Tester {
@@ -41,17 +43,17 @@ public class ScryptTester extends Tester {
 			final int dkLen) {
 		final ArrayList<Object> arr = new ArrayList<>();
 		arr.add("scrypt");
-		arr.add("-logn");
+		arr.add("--logn");
 		arr.add(logN);
 		arr.add("-r");
 		arr.add(r);
 		arr.add("-p");
 		arr.add(p);
-		arr.add("-dklen");
+		arr.add("--dklen");
 		arr.add(dkLen);
-		arr.add("-rawsalt");
-		arr.add("-rawpassword");
-		arr.add("-rawoutput");
+		arr.add("--rawsalt");
+		arr.add("--rawpassword");
+		arr.add("--rawoutput");
 		return arr.toArray();
 	}
 	
@@ -81,6 +83,10 @@ public class ScryptTester extends Tester {
 			final byte[] result = runner.runRustCrypt(data, getParams(logN, r, p, dkLen));
 			
 			final byte[] expectedResult = SCrypt.scrypt(password, salt, (1 << logN), r, p, dkLen);
+			
+			// TODO - this is basically debugging
+			System.out.println("Exp: " + Hex.encodeHexString(expectedResult));
+			System.out.println("Res: " + Hex.encodeHexString(result));
 			
 			if (!Arrays.equals(result, expectedResult)) {
 				return false;

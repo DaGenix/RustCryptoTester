@@ -15,7 +15,8 @@ public class App {
 	private static List<Tester> getTesters() {
 		// TODO - Store name somewhere
 		final List<Tester> testers = new ArrayList<>();
-		testers.add(new ScryptTester(8, 16, 1, 16, 1, 16, 1000));
+		// TODO - Better parameters
+		testers.add(new ScryptTester(8, 12, 1, 8, 1, 2, 5));
 		return testers;
 	}
 	
@@ -51,11 +52,14 @@ public class App {
 		System.out.println("Starting Rust Crypto Tests:");
 
 		final RustCryptRunner runner = new RustCryptRunner(new File(rustExec));
-		
-		for (final Tester t : getTesters()) {
-			final Random rand = new Random(0);
-			final boolean result = t.test(runner, rand);
-			System.out.println("Test passed: " + result);
+		try {
+			for (final Tester t : getTesters()) {
+				final Random rand = new Random(0);
+				final boolean result = t.test(runner, rand);
+				System.out.println("Test passed: " + result);
+			}
+		} finally {
+			runner.close();
 		}
 
 		System.out.println("Done");
